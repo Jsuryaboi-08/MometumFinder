@@ -36,15 +36,17 @@ INDICATOR_PERIODS = {
 }
 
 # Momentum Score Weights (must sum to 1.0)
-# Adjusted for SHORT-TERM investment horizon
+# Combines technical momentum with fundamental quality
 SCORE_WEIGHTS = {
-    "roc_5": 0.20,      # Short-term momentum (high priority)
-    "roc_10": 0.15,     # Medium-term momentum
-    "roc_20": 0.10,     # Longer-term trend (reduced)
-    "relative_strength": 0.15,  # Market outperformance
-    "volume_score": 0.10,       # Confirmation
-    "rsi_score": 0.20,          # RSI - INCREASED for short-term
-    "ma_score": 0.10,           # Moving Average crossover signals
+    "roc_5": 0.17,              # Short-term momentum
+    "roc_10": 0.12,             # Medium-term momentum
+    "roc_20": 0.08,             # Longer-term trend
+    "relative_strength": 0.12,  # Market outperformance
+    "volume_score": 0.08,       # Volume confirmation
+    "rsi_score": 0.16,          # RSI momentum
+    "ma_score": 0.07,           # Moving Average signals
+    "fundamental_score": 0.10,  # P/E, P/B, ROE, D/E, Current Ratio
+    "trading_score": 0.10,      # EPS, Beta, 52-wk range, liquidity
 }
 
 # Signal Thresholds

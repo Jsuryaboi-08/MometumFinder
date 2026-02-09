@@ -19,7 +19,7 @@ from data.database import (
     get_sectors_performance, get_connection, init_db
 )
 from data.stock_list import NIFTY_STOCKS, get_stock_sector
-from analysis.indicators import calculate_all_indicators, get_latest_indicators as get_indicator_dict
+from analysis.indicators import calculate_all_indicators, get_latest_indicators as get_indicator_dict, detect_ma_crossovers
 from analysis.momentum import calculate_momentum_score, get_score_breakdown
 from analysis.signals import (
     generate_signals, get_signal_summary, get_top_signals,
@@ -27,6 +27,7 @@ from analysis.signals import (
 )
 from analysis.forecast import calculate_monte_carlo_forecast, get_volatility_analysis
 from analysis.gems import identify_gems, get_gem_summary, get_sector_gems
+from analysis.ratios import fetch_all_ratios
 
 
 app = Flask(__name__)
@@ -124,13 +125,13 @@ def get_stock_detail(symbol):
             symbol = f"{symbol}.NS"
         
         # Get price history
-        prices = get_stock_prices(symbol, days=60)
+        prices = get_stock_prices(symbol, days=90)
         
         if not prices:
             return jsonify({'error': f'No data found for {symbol}'}), 404
         
         # Get indicator history
-        indicators = get_stock_indicators(symbol, days=30)
+        indicators = get_stock_indicators(symbol, days=90)
         
         if not indicators:
             return jsonify({'error': f'No indicators calculated for {symbol}'}), 404
@@ -138,16 +139,43 @@ def get_stock_detail(symbol):
         # Get latest indicators
         latest = indicators[0] if indicators else {}
         
-        # Calculate score breakdown
-        breakdown = get_score_breakdown(latest)
+        # KEY CHANGE: Fetch fundamental ratios
+        ratios = fetch_all_ratios(symbol)
+        
+        # Calculate score breakdown with ratios included
+        breakdown = get_score_breakdown(latest, ratios)
         
         # Generate signal
         from analysis.signals import classify_signal
         signal_type, rationale = classify_signal(latest)
         
+        # Calculate MA Crossovers
+        ma_crossovers = []
+        if indicators and len(indicators) > 1:
+            try:
+                # Create series for detection
+                df = pd.DataFrame(indicators).sort_values('date')
+                ma_crossovers = detect_ma_crossovers(
+                    df['sma_20'], 
+                    df['sma_50'],
+                    df['date']
+                )
+                # Sort descending by date
+                ma_crossovers.reverse()
+            except Exception as e:
+                print(f"Error calculating crossovers: {e}")
+
         # Get stock info
         stocks = get_all_stocks()
         stock_info = next((s for s in stocks if s['symbol'] == symbol), {})
+        
+        # Update latest momentum score based on new calculation
+        # The breakdown['total_score'] has the updated score including ratios
+        latest_score = breakdown['total_score']
+        
+        # Calculate volatility analysis
+        # Re-using the price data we already have
+        vol_analysis = get_volatility_analysis(prices)
         
         return jsonify({
             'symbol': symbol,
@@ -158,7 +186,8 @@ def get_stock_detail(symbol):
                 'date': latest.get('date'),
                 'signal': signal_type,
                 'signal_rationale': rationale,
-                'momentum_score': latest.get('momentum_score')
+                'momentum_score': latest_score, # Use updated score
+                'volatility': vol_analysis.get('volatility_rank', 'Medium')
             },
             'indicators': {
                 'rsi': latest.get('rsi'),
@@ -177,11 +206,13 @@ def get_stock_detail(symbol):
                 'relative_volume': latest.get('relative_volume'),
                 'relative_strength_5': latest.get('relative_strength_5'),
                 'relative_strength_10': latest.get('relative_strength_10'),
-                'relative_strength_20': latest.get('relative_strength_20')
+                'relative_strength_20': latest.get('relative_strength_20'),
+                'ma_crossovers': ma_crossovers  # Add crossovers
             },
+            'ratios': ratios,  # Add fundamental/trading ratios
             'score_breakdown': breakdown,
-            'price_history': prices[:30],  # Last 30 days
-            'indicator_history': indicators[:30]
+            'price_history': prices[:90],  # Increased to 90 days for chart context
+            'indicator_history': indicators[:90] # Increased context
         })
         
     except Exception as e:

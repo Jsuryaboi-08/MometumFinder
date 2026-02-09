@@ -164,17 +164,18 @@ def calculate_relative_strength_score(rs_5: pd.Series, rs_10: pd.Series,
     return pd.Series(scores, index=rs_5.index)
 
 
-def calculate_momentum_score(indicators: Dict) -> float:
+def calculate_momentum_score(indicators: Dict, ratios: Dict = None) -> float:
     """
     Calculate final composite momentum score for a single stock.
     
     Args:
-        indicators: Dictionary with indicator values
+        indicators: Dictionary with technical indicator values
+        ratios: Optional dictionary with fundamental/trading ratios
         
     Returns:
         Momentum score from 0-100
     """
-    # Get individual scores
+    # Get individual technical scores
     roc_5_score = score_single_roc(indicators.get('roc_5', 0))
     roc_10_score = score_single_roc(indicators.get('roc_10', 0))
     roc_20_score = score_single_roc(indicators.get('roc_20', 0))
@@ -195,6 +196,15 @@ def calculate_momentum_score(indicators: Dict) -> float:
         indicators.get('sma_50', 0)
     )
     
+    # Fundamental and Trading scores
+    fundamental_score = 50  # Default neutral
+    trading_score = 50  # Default neutral
+    
+    if ratios:
+        from analysis.ratios import calculate_fundamental_score, calculate_trading_score
+        fundamental_score = calculate_fundamental_score(ratios)
+        trading_score = calculate_trading_score(ratios)
+    
     # Calculate weighted average
     score = (
         roc_5_score * SCORE_WEIGHTS['roc_5'] +
@@ -203,7 +213,9 @@ def calculate_momentum_score(indicators: Dict) -> float:
         rs_score * SCORE_WEIGHTS['relative_strength'] +
         volume_score * SCORE_WEIGHTS['volume_score'] +
         rsi_score * SCORE_WEIGHTS['rsi_score'] +
-        ma_score * SCORE_WEIGHTS.get('ma_score', 0)
+        ma_score * SCORE_WEIGHTS.get('ma_score', 0) +
+        fundamental_score * SCORE_WEIGHTS.get('fundamental_score', 0) +
+        trading_score * SCORE_WEIGHTS.get('trading_score', 0)
     )
     
     return round(score, 2)
@@ -354,7 +366,7 @@ def rank_stocks_by_momentum(stocks_data: List[Dict]) -> List[Dict]:
     return ranked
 
 
-def get_score_breakdown(indicators: Dict) -> Dict:
+def get_score_breakdown(indicators: Dict, ratios: Dict = None) -> Dict:
     """
     Get detailed breakdown of how the momentum score was calculated.
     
@@ -376,7 +388,15 @@ def get_score_breakdown(indicators: Dict) -> Dict:
         indicators.get('sma_50', 0)
     )
     
-    return {
+    # Fundamental and Trading scores
+    fundamental_score = 50
+    trading_score = 50
+    if ratios:
+        from analysis.ratios import calculate_fundamental_score, calculate_trading_score
+        fundamental_score = calculate_fundamental_score(ratios)
+        trading_score = calculate_trading_score(ratios)
+    
+    breakdown = {
         'roc_5': {
             'value': indicators.get('roc_5'),
             'score': round(roc_5_score, 2),
@@ -419,8 +439,22 @@ def get_score_breakdown(indicators: Dict) -> Dict:
             'weight': SCORE_WEIGHTS.get('ma_score', 0),
             'contribution': round(ma_score * SCORE_WEIGHTS.get('ma_score', 0), 2)
         },
-        'total_score': calculate_momentum_score(indicators)
+        'fundamental': {
+            'value': 'P/E, P/B, ROE, D/E, CR',
+            'score': round(fundamental_score, 2),
+            'weight': SCORE_WEIGHTS.get('fundamental_score', 0),
+            'contribution': round(fundamental_score * SCORE_WEIGHTS.get('fundamental_score', 0), 2)
+        },
+        'trading': {
+            'value': 'EPS, Beta, 52wk, Vol',
+            'score': round(trading_score, 2),
+            'weight': SCORE_WEIGHTS.get('trading_score', 0),
+            'contribution': round(trading_score * SCORE_WEIGHTS.get('trading_score', 0), 2)
+        },
+        'total_score': calculate_momentum_score(indicators, ratios)
     }
+    
+    return breakdown
 
 
 if __name__ == "__main__":

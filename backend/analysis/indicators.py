@@ -286,7 +286,66 @@ def calculate_all_indicators(df: pd.DataFrame, nifty_df: pd.DataFrame = None) ->
         result['relative_strength_10'] = None
         result['relative_strength_20'] = None
     
+    # Detect MA crossovers
+    result['ma_crossovers'] = detect_ma_crossovers(
+        result['sma_20'], 
+        result['sma_50'],
+        result['date']
+    )
+    
     return result
+
+
+def detect_ma_crossovers(sma_20: pd.Series, sma_50: pd.Series, dates: pd.Series) -> list:
+    """
+    Detect Moving Average crossovers (Golden Cross / Death Cross).
+    
+    Golden Cross: SMA20 crosses above SMA50 (bullish)
+    Death Cross: SMA20 crosses below SMA50 (bearish)
+    
+    Returns:
+        List of crossover events with date, type, and prices
+    """
+    crossovers = []
+    
+    if sma_20 is None or sma_50 is None:
+        return crossovers
+    
+    # Need at least 2 points to detect a crossover
+    if len(sma_20) < 2 or len(sma_50) < 2:
+        return crossovers
+    
+    for i in range(1, len(sma_20)):
+        prev_20 = sma_20.iloc[i-1]
+        curr_20 = sma_20.iloc[i]
+        prev_50 = sma_50.iloc[i-1]
+        curr_50 = sma_50.iloc[i]
+        
+        # Skip if any value is NaN
+        if pd.isna(prev_20) or pd.isna(curr_20) or pd.isna(prev_50) or pd.isna(curr_50):
+            continue
+        
+        # Golden Cross: SMA20 crosses above SMA50
+        if prev_20 <= prev_50 and curr_20 > curr_50:
+            crossovers.append({
+                'date': dates.iloc[i],
+                'type': 'golden_cross',
+                'sma_20': round(curr_20, 2),
+                'sma_50': round(curr_50, 2),
+                'signal': 'bullish'
+            })
+        
+        # Death Cross: SMA20 crosses below SMA50
+        elif prev_20 >= prev_50 and curr_20 < curr_50:
+            crossovers.append({
+                'date': dates.iloc[i],
+                'type': 'death_cross',
+                'sma_20': round(curr_20, 2),
+                'sma_50': round(curr_50, 2),
+                'signal': 'bearish'
+            })
+    
+    return crossovers
 
 
 def get_latest_indicators(df: pd.DataFrame) -> dict:
