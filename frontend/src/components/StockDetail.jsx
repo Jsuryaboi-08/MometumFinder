@@ -1,7 +1,8 @@
+
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart, ReferenceDot } from 'recharts'
-import api, { formatNumber, getSignalColor, getScoreColor } from '../services/api'
+import api, { formatNumber } from '../services/api'
 
 function StockDetail() {
     const { symbol } = useParams()
@@ -18,10 +19,13 @@ function StockDetail() {
         try {
             setLoading(true)
             const result = await api.getStockDetail(symbol)
+            if (result.error) {
+                throw new Error(result.error)
+            }
             setData(result)
             setError(null)
         } catch (err) {
-            setError('Failed to load stock data. Please try again.')
+            setError(err.message || 'Failed to load stock data. Please try again.')
             console.error(err)
         } finally {
             setLoading(false)
@@ -36,11 +40,11 @@ function StockDetail() {
         )
     }
 
-    if (error || !data) {
+    if (error || !data || !data.current) {
         return (
             <div className="text-center py-12 bg-gray-900 min-h-screen">
                 <h2 className="text-2xl font-bold text-gray-100 mb-4">Error Loading Data</h2>
-                <p className="text-red-400 mb-6">{error || 'Stock not found'}</p>
+                <p className="text-red-400 mb-6">{error || 'Stock data incomplete'}</p>
                 <button
                     onClick={() => navigate('/')}
                     className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition"
@@ -52,10 +56,10 @@ function StockDetail() {
     }
 
     const { current, indicators, ratios } = data
-    const signalColor = getSignalColor(current.signal)
-    const scoreColor = getScoreColor(current.momentum_score)
+    const signalStyle = getSignalStyle(current.signal)
+    const scoreStyle = getScoreStyle(current.momentum_score)
 
-    // Format history for chart - merging price and indicators
+    // Format history for chart
     const priceHistory = data.price_history ? [...data.price_history].reverse() : []
     const indicatorHistory = data.indicator_history ? [...data.indicator_history].reverse() : []
 
@@ -95,14 +99,14 @@ function StockDetail() {
                             <p className="text-xs text-gray-500 mt-1">{new Date(current.date).toLocaleDateString()}</p>
                         </div>
 
-                        <div className={`px-6 py-4 rounded-xl border ${signalColor.bg.replace('bg-', 'bg-opacity-20 bg-')} ${signalColor.border} backdrop-blur-sm`}>
-                            <p className={`text-sm font-semibold mb-1 ${signalColor.text} uppercase tracking-wider`}>Signal</p>
-                            <p className={`text-2xl font-bold ${signalColor.text}`}>{current.signal.replace('_', ' ')}</p>
+                        <div className={`px-6 py-4 rounded-xl border ${signalStyle.bg} ${signalStyle.border} backdrop-blur-sm`}>
+                            <p className={`text-sm font-semibold mb-1 ${signalStyle.text} uppercase tracking-wider`}>Signal</p>
+                            <p className={`text-2xl font-bold ${signalStyle.text}`}>{current.signal.replace('_', ' ')}</p>
                         </div>
 
                         <div className="px-6 py-4 rounded-xl border border-gray-700 bg-gray-800/50">
                             <p className="text-sm font-semibold text-gray-400 mb-1 uppercase tracking-wider">Momentum Score</p>
-                            <p className={`text-3xl font-bold ${scoreColor.replace('text-', 'text-')}`}>{current.momentum_score}<span className="text-lg text-gray-600">/100</span></p>
+                            <p className={`text-3xl font-bold ${scoreStyle}`}>{current.momentum_score}<span className="text-lg text-gray-600">/100</span></p>
                         </div>
                     </div>
                 </div>
@@ -173,7 +177,6 @@ function StockDetail() {
                                         name="SMA 50"
                                         connectNulls
                                     />
-                                    {/* Render Crossover Points */}
                                     {crossovers.map((cross, idx) => (
                                         <ReferenceDot
                                             key={idx}
@@ -211,80 +214,29 @@ function StockDetail() {
 
                     {/* Ratios Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Fundamental Ratios */}
                         <div className="bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
                             <h3 className="text-lg font-bold text-gray-100 mb-4 flex items-center gap-2">
                                 <span className="text-indigo-400">📊</span> Fundamental Ratios
                             </h3>
                             <div className="space-y-4">
-                                <RatioItem
-                                    label="P/E Ratio"
-                                    value={ratios?.pe_ratio}
-                                    ideal="8-20"
-                                    tooltip="Price to Earnings. 8-20 is typically considered fair value."
-                                />
-                                <RatioItem
-                                    label="P/B Ratio"
-                                    value={ratios?.pb_ratio}
-                                    ideal="0.5-3.0"
-                                    tooltip="Price to Book. Lower is better value."
-                                />
-                                <RatioItem
-                                    label="ROE"
-                                    value={ratios?.roe}
-                                    suffix="%"
-                                    ideal=">15%"
-                                    tooltip="Return on Equity. Higher is better."
-                                />
-                                <RatioItem
-                                    label="Debt/Equity"
-                                    value={ratios?.debt_to_equity}
-                                    ideal="<1.0"
-                                    tooltip="Debt to Equity ratio. Lower means less leverage."
-                                />
-                                <RatioItem
-                                    label="Current Ratio"
-                                    value={ratios?.current_ratio}
-                                    ideal="1.5-2.5"
-                                    tooltip="Measures liquidity. Higher is safer."
-                                />
+                                <RatioItem label="P/E Ratio" value={ratios?.pe_ratio} ideal="8-20" tooltip="Price to Earnings" />
+                                <RatioItem label="P/B Ratio" value={ratios?.pb_ratio} ideal="0.5-3.0" tooltip="Price to Book" />
+                                <RatioItem label="ROE" value={ratios?.roe} suffix="%" ideal=">15%" tooltip="Return on Equity" />
+                                <RatioItem label="Debt/Equity" value={ratios?.debt_to_equity} ideal="<1.0" tooltip="Debt to Equity" />
+                                <RatioItem label="Current Ratio" value={ratios?.current_ratio} ideal="1.5-2.5" tooltip="Liquidity" />
                             </div>
                         </div>
 
-                        {/* Trading Ratios */}
                         <div className="bg-gray-800 rounded-xl shadow-lg p-6 border border-gray-700">
                             <h3 className="text-lg font-bold text-gray-100 mb-4 flex items-center gap-2">
                                 <span className="text-orange-400">📈</span> Trading Ratios
                             </h3>
                             <div className="space-y-4">
-                                <RatioItem
-                                    label="EPS (TTM)"
-                                    value={ratios?.eps}
-                                    tooltip="Earnings Per Share (Trailing Twelve Months)"
-                                />
-                                <RatioItem
-                                    label="Beta"
-                                    value={ratios?.beta}
-                                    ideal="0.8-1.2"
-                                    tooltip="Volatility relative to market. 1.0 is market average."
-                                />
-                                <RatioItem
-                                    label="52W Position"
-                                    value={ratios?.week_52_position}
-                                    suffix="%"
-                                    ideal=">60%"
-                                    tooltip="Position within 52-week range (0% = Low, 100% = High)"
-                                />
-                                <RatioItem
-                                    label="Avg Volume"
-                                    value={ratios?.avg_volume ? formatNumber(ratios.avg_volume) : 'N/A'}
-                                    tooltip="Average daily trading volume"
-                                />
-                                <RatioItem
-                                    label="Market Cap"
-                                    value={ratios?.market_cap_category}
-                                    tooltip="Size category (Large, Mid, Small Cap)"
-                                />
+                                <RatioItem label="EPS (TTM)" value={ratios?.eps} tooltip="Earnings Per Share" />
+                                <RatioItem label="Beta" value={ratios?.beta} ideal="0.8-1.2" tooltip="Volatility" />
+                                <RatioItem label="52W Position" value={ratios?.week_52_position} suffix="%" ideal=">60%" tooltip="Range Position" />
+                                <RatioItem label="Avg Volume" value={ratios?.avg_volume ? formatNumber(ratios.avg_volume) : 'N/A'} tooltip="Daily Volume" />
+                                <RatioItem label="Market Cap" value={ratios?.market_cap_category} tooltip="Size Category" />
                             </div>
                         </div>
                     </div>
@@ -330,6 +282,24 @@ function StockDetail() {
             </div>
         </div>
     )
+}
+
+// Helper functions for styles
+function getSignalStyle(signal) {
+    switch (signal) {
+        case 'strong_buy': return { bg: 'bg-green-500/20', border: 'border-green-500/50', text: 'text-green-400' }
+        case 'buy': return { bg: 'bg-green-500/10', border: 'border-green-500/30', text: 'text-green-400' }
+        case 'hold': return { bg: 'bg-yellow-500/20', border: 'border-yellow-500/50', text: 'text-yellow-400' }
+        case 'sell': return { bg: 'bg-red-500/20', border: 'border-red-500/50', text: 'text-red-400' }
+        case 'avoid': return { bg: 'bg-gray-500/20', border: 'border-gray-500/50', text: 'text-gray-400' }
+        default: return { bg: 'bg-gray-700', border: 'border-gray-600', text: 'text-gray-300' }
+    }
+}
+
+function getScoreStyle(score) {
+    if (score >= 70) return 'text-green-400'
+    if (score >= 50) return 'text-yellow-400'
+    return 'text-red-400'
 }
 
 function RatioItem({ label, value, suffix = '', ideal, tooltip }) {
