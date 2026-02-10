@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, ComposedChart, ReferenceDot } from 'recharts'
 import api, { formatNumber } from '../services/api'
 
@@ -109,6 +109,18 @@ function StockDetail() {
                             <p className={`text-3xl font-bold ${scoreStyle}`}>{current.momentum_score}<span className="text-lg text-gray-600">/100</span></p>
                         </div>
                     </div>
+                </div>
+
+                {/* Monte Carlo Forecast Button */}
+                <div className="mt-4 flex justify-end">
+                    <Link
+                        to={`/forecast/${data.symbol}`}
+                        className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold rounded-lg shadow-lg shadow-cyan-500/20 transition-all duration-200 hover:shadow-cyan-500/40 hover:scale-105"
+                    >
+                        <span className="text-lg">📈</span>
+                        Monte Carlo Forecast
+                        <span className="text-xs opacity-75">→</span>
+                    </Link>
                 </div>
             </div>
 
