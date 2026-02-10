@@ -21,6 +21,8 @@ def main():
                         help='Fetch initial data for all stocks')
     parser.add_argument('--update', action='store_true',
                         help='Run daily update (fetch + calculate)')
+    parser.add_argument('--recalculate', action='store_true',
+                        help='Recalculate indicators without fetching new data')
     parser.add_argument('--scheduler', action='store_true',
                         help='Start API with scheduler enabled')
     parser.add_argument('--init-db', action='store_true',
@@ -32,6 +34,12 @@ def main():
         from data.database import init_db
         init_db()
         print("Database initialized successfully!")
+        return
+    
+    if args.recalculate:
+        print("Recalculating indicators (skipping data fetch)...")
+        from scheduler.jobs import run_manual_update
+        run_manual_update(skip_fetch=True)
         return
     
     if args.fetch_data:
@@ -49,7 +57,7 @@ def main():
         # Run indicator calculation
         print("\nCalculating indicators...")
         from scheduler.jobs import run_manual_update
-        run_manual_update()
+        run_manual_update(skip_fetch=True)
         
         return
     

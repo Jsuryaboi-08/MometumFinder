@@ -250,48 +250,52 @@ def calculate_all_indicators(df: pd.DataFrame, nifty_df: pd.DataFrame = None) ->
     )
     
     # Relative Strength vs Nifty (if Nifty data provided)
-    if nifty_df is not None and not nifty_df.empty:
-        nifty_sorted = nifty_df.sort_values('date').reset_index(drop=True)
-        nifty_close = nifty_sorted['close']
-        
-        # Calculate returns for different periods
-        stock_ret_5 = calculate_roc(close, 5)
-        stock_ret_10 = calculate_roc(close, 10)
-        stock_ret_20 = calculate_roc(close, 20)
-        
-        nifty_ret_5 = calculate_roc(nifty_close, 5)
-        nifty_ret_10 = calculate_roc(nifty_close, 10)
-        nifty_ret_20 = calculate_roc(nifty_close, 20)
-        
-        # Align by date if possible, otherwise use direct comparison
-        # Note: This is simplified; in production you'd merge on date
-        min_len = min(len(result), len(nifty_sorted))
-        
-        result['relative_strength_5'] = None
-        result['relative_strength_10'] = None
-        result['relative_strength_20'] = None
-        
-        if min_len > 20:
-            result.loc[:min_len-1, 'relative_strength_5'] = (
-                stock_ret_5.iloc[:min_len].values - nifty_ret_5.iloc[:min_len].values
-            )
-            result.loc[:min_len-1, 'relative_strength_10'] = (
-                stock_ret_10.iloc[:min_len].values - nifty_ret_10.iloc[:min_len].values
-            )
-            result.loc[:min_len-1, 'relative_strength_20'] = (
-                stock_ret_20.iloc[:min_len].values - nifty_ret_20.iloc[:min_len].values
-            )
-    else:
+    # Relative Strength vs Nifty (if Nifty data provided)
+    try:
+        if nifty_df is not None and not nifty_df.empty:
+            nifty_sorted = nifty_df.sort_values('date').reset_index(drop=True)
+            nifty_close = nifty_sorted['close']
+            
+            # Calculate returns for different periods
+            stock_ret_5 = calculate_roc(close, 5)
+            stock_ret_10 = calculate_roc(close, 10)
+            stock_ret_20 = calculate_roc(close, 20)
+            
+            nifty_ret_5 = calculate_roc(nifty_close, 5)
+            nifty_ret_10 = calculate_roc(nifty_close, 10)
+            nifty_ret_20 = calculate_roc(nifty_close, 20)
+            
+            # Align by date if possible, otherwise use direct comparison
+            min_len = min(len(result), len(nifty_sorted))
+            
+            result['relative_strength_5'] = None
+            result['relative_strength_10'] = None
+            result['relative_strength_20'] = None
+            
+            if min_len > 20:
+                result.loc[:min_len-1, 'relative_strength_5'] = (
+                    stock_ret_5.iloc[:min_len].values - nifty_ret_5.iloc[:min_len].values
+                )
+                result.loc[:min_len-1, 'relative_strength_10'] = (
+                    stock_ret_10.iloc[:min_len].values - nifty_ret_10.iloc[:min_len].values
+                )
+                result.loc[:min_len-1, 'relative_strength_20'] = (
+                    stock_ret_20.iloc[:min_len].values - nifty_ret_20.iloc[:min_len].values
+                )
+        else:
+            result['relative_strength_5'] = None
+            result['relative_strength_10'] = None
+            result['relative_strength_20'] = None
+    except Exception as e:
+        print(f"Error calculating relative strength: {e}")
         result['relative_strength_5'] = None
         result['relative_strength_10'] = None
         result['relative_strength_20'] = None
     
-    # Detect MA crossovers
-    result['ma_crossovers'] = detect_ma_crossovers(
-        result['sma_20'], 
-        result['sma_50'],
-        result['date']
-    )
+    # Detect MA crossovers - returned separately or used for signals logic elsewhere
+    # result['ma_crossovers'] = detect_ma_crossovers(...)
+    
+    return result
     
     return result
 

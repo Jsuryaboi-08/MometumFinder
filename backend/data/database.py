@@ -205,11 +205,10 @@ def get_stock_prices(symbol: str, days: int = 60) -> list:
         SELECT * FROM prices 
         WHERE symbol = ? 
         ORDER BY date DESC 
-        LIMIT ?
-    ''', (symbol, days))
+    ''', (symbol,))
     rows = cursor.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return [dict(row) for row in rows][:days]
 
 
 def get_all_stocks() -> list:
@@ -247,11 +246,10 @@ def get_stock_indicators(symbol: str, days: int = 30) -> list:
         SELECT * FROM indicators 
         WHERE symbol = ? 
         ORDER BY date DESC 
-        LIMIT ?
-    ''', (symbol, days))
+    ''', (symbol,))
     rows = cursor.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return [dict(row) for row in rows][:days]
 
 
 def get_latest_signals(date: str = None) -> list:
@@ -286,11 +284,10 @@ def get_nifty_data(days: int = 60) -> list:
     cursor.execute('''
         SELECT * FROM nifty_history 
         ORDER BY date DESC 
-        LIMIT ?
-    ''', (days,))
+    ''')
     rows = cursor.fetchall()
     conn.close()
-    return [dict(row) for row in rows]
+    return [dict(row) for row in rows][:days]
 
 
 def get_sectors_performance() -> list:

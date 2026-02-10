@@ -4,6 +4,7 @@ Handles automated daily data updates and analysis.
 """
 from datetime import datetime
 import sys
+import traceback
 from pathlib import Path
 
 # Add parent to path for imports
@@ -18,13 +19,13 @@ def get_scheduler():
     return BackgroundScheduler(timezone=pytz.timezone(TIMEZONE))
 
 
-def daily_update_job():
+def daily_update_job(skip_fetch=False):
     """
     Daily update job - runs after market close.
     
     Tasks:
-    1. Fetch latest price data for all stocks
-    2. Update Nifty 50 index data
+    1. Fetch latest price data for all stocks (skipped if skip_fetch=True)
+    2. Update Nifty 50 index data (skipped if skip_fetch=True)
     3. Calculate all technical indicators
     4. Generate momentum scores
     5. Create signal recommendations
@@ -42,15 +43,18 @@ def daily_update_job():
     print(f"{'='*60}\n")
     
     try:
-        # Step 1: Update stock data
-        print("Step 1: Updating stock price data...")
-        update_all_stocks()
-        
-        # Step 2: Update Nifty data
-        print("\nStep 2: Updating Nifty 50 data...")
-        nifty_df = fetch_nifty_data(days=5)
-        if not nifty_df.empty:
-            insert_nifty_data(nifty_df.to_dict('records'))
+        if not skip_fetch:
+            # Step 1: Update stock data
+            print("Step 1: Updating stock price data...")
+            update_all_stocks()
+            
+            # Step 2: Update Nifty data
+            print("\nStep 2: Updating Nifty 50 data...")
+            nifty_df = fetch_nifty_data(days=5)
+            if not nifty_df.empty:
+                insert_nifty_data(nifty_df.to_dict('records'))
+        else:
+            print("Skipping data fetch (Step 1 & 2)...")
         
         # Step 3 & 4: Calculate indicators and scores
         print("\nStep 3-4: Calculating indicators and momentum scores...")
@@ -97,11 +101,24 @@ def daily_update_job():
                     print(f"  Processed {processed} stocks...")
                     
             except Exception as e:
-                errors.append(f"{symbol}: {str(e)}")
+                # errors.append(f"{symbol}: {str(e)}")
+                errors.append(f"{symbol}: {traceback.format_exc()}")
         
         print(f"\n✓ Processed {processed} stocks")
         if errors:
             print(f"⚠ {len(errors)} errors occurred")
+            print("First 5 errors:")
+            for err in errors[:5]:
+                print(f"  - {err}")
+            
+            # Write errors to file
+            try:
+                with open("error_dump.txt", "w", encoding="utf-8") as f:
+                    f.write(f"Total Errors: {len(errors)}\n\n")
+                    for err in errors:
+                        f.write(f"{err}\n")
+            except Exception as e:
+                print(f"Failed to write error dump: {e}")
         
         print(f"\n{'='*60}")
         print(f"Daily Update Job Completed - {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -112,7 +129,7 @@ def daily_update_job():
         raise
 
 
-def setup_scheduler(scheduler: BackgroundScheduler = None) -> BackgroundScheduler:
+def setup_scheduler(scheduler=None):
     """
     Set up the scheduled jobs.
     
@@ -147,10 +164,10 @@ def setup_scheduler(scheduler: BackgroundScheduler = None) -> BackgroundSchedule
     return scheduler
 
 
-def run_manual_update():
+def run_manual_update(skip_fetch=False):
     """Run the update job manually (for testing or one-time updates)."""
     print("Starting manual update...")
-    daily_update_job()
+    daily_update_job(skip_fetch=skip_fetch)
 
 
 if __name__ == "__main__":
